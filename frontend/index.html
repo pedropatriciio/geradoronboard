@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gerador de Onboarding</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <main class="container">
+    <h1>Gerador de Onboarding</h1>
+    <p class="subtitle">
+      Gere automaticamente a apresentação de onboarding a partir do contrato.
+    </p>
+
+    <form id="pptForm">
+
+      <label>Contrato (PDF)</label>
+      <input
+        type="file"
+        id="contrato_pdf"
+        name="contrato_pdf"
+        accept=".pdf"
+        required
+      />
+
+      <label>Nome da instituição</label>
+      <input
+        type="text"
+        name="instituicao"
+        placeholder="Ex: UNIFASC"
+        required
+      />
+
+      <label>Possui aplicativo?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="app" value="Sim"> Sim</label>
+        <label><input type="radio" name="app" value="Não" checked> Não</label>
+      </div>
+
+      <label>Comercial responsável</label>
+      <select id="comercial" name="comercial" required>
+        <option value="">Selecione</option>
+      </select>
+
+      <label>CS responsável</label>
+      <select id="cs" name="cs" required>
+        <option value="">Selecione</option>
+      </select>
+
+      <label>Emails para acesso ao conecta/analyze</label>
+
+<input
+  type="email"
+  name="email_1"
+  placeholder="email@instituicao.com"
+  required
+/>
+
+<input
+  type="email"
+  name="email_2"
+  placeholder="email@instituicao.com (opcional)"
+/>
+
+<input
+  type="email"
+  name="email_3"
+  placeholder="email@instituicao.com (opcional)"
+/>
+
+
+      <button id="submitBtn" type="submit">
+        Gerar apresentação PPTX
+      </button>
+
+      <div id="statusMessage" class="status"></div>
+    </form>
+
+    <footer>
+      Sistema interno • Customer Success • Minha Biblioteca
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
