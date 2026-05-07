@@ -1,24 +1,37 @@
-import psycopg2
 import os
+import psycopg2
 
-# O Render vai fornecer essa variável
-DATABASE_URL = os.environ.get("DATABASE_URL_TEST")
+# ======================================================
+# CONEXÃO COM O BANCO (SUPABASE / POSTGRES)
+# ======================================================
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 def get_connection():
+    """
+    Cria uma nova conexão com o banco PostgreSQL do Supabase.
+    """
     if not DATABASE_URL:
         raise Exception("DATABASE_URL não configurada nas variáveis de ambiente")
+
     return psycopg2.connect(DATABASE_URL)
 
 
 def init_db():
-    # Nada a fazer aqui: no Supabase a tabela já foi criada manualmente
+    """
+    Mantido apenas por compatibilidade.
+    No Supabase a tabela já é criada manualmente.
+    """
     pass
 
 
+# ======================================================
+# BUSCAR UM COLABORADOR (COMERCIAL OU CS)
+# ======================================================
+
 def buscar_colaborador(nome, papel):
-    if not nome:
+    if not nome or not papel:
         return None
 
     conn = get_connection()
@@ -48,6 +61,10 @@ def buscar_colaborador(nome, papel):
         "telefone": row[2],
     }
 
+
+# ======================================================
+# LISTAR TODOS OS COLABORADORES
+# ======================================================
 
 def listar_colaboradores():
     conn = get_connection()
