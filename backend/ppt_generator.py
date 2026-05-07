@@ -3,13 +3,19 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Pt
 from pptx.dml.color import RGBColor
 
+
+# ======================================================
+# CORES
+# ======================================================
+
 AZUL_ESCURO = RGBColor(19, 52, 87)
 BRANCO = RGBColor(255, 255, 255)
 
 
-# --------------------------------------------------
-# SLIDE 1 — BOAS‑VINDAS / INSTITUIÇÃO / DATA
-# --------------------------------------------------
+# ======================================================
+# SLIDE 1 — INSTITUIÇÃO / DATA (SEM ALTERAR BOAS-VINDAS)
+# ======================================================
+
 def atualizar_slide_1(slide, payload):
     for shape in slide.shapes:
         if not shape.has_text_frame:
@@ -34,9 +40,10 @@ def atualizar_slide_1(slide, payload):
                     paragraph.alignment = PP_ALIGN.CENTER
 
 
-# --------------------------------------------------
-# SLIDE 5 — RESUMO DO CONTRATO
-# --------------------------------------------------
+# ======================================================
+# SLIDE 5 — RESUMO DO CONTRATO (PDF)
+# ======================================================
+
 def atualizar_slide_5(slide, payload):
     resumo = (
         f"Vigência: {payload['vigencia']}\n"
@@ -55,16 +62,23 @@ def atualizar_slide_5(slide, payload):
             for linha in resumo.split("\n"):
                 p = tf.add_paragraph() if tf.text else tf.paragraphs[0]
                 p.text = linha
+                p.alignment = PP_ALIGN.LEFT
+
+                # ✅ Espaçamento entre linhas 1,5
+                p.line_spacing = 1.5
+
                 for run in p.runs:
                     run.font.name = "Poppins Light"
-                    run.font.size = Pt(14)
+                    run.font.size = Pt(11)
                     run.font.color.rgb = BRANCO
+
             break
 
 
-# --------------------------------------------------
-# SLIDE 9 — RESPONSÁVEIS (FONTE 12)
-# --------------------------------------------------
+# ======================================================
+# SLIDE 9 — RESPONSÁVEIS (SUPABASE)
+# ======================================================
+
 def atualizar_slide_9(slide, payload):
     linhas = [
         "Comercial Responsável:",
@@ -87,16 +101,19 @@ def atualizar_slide_9(slide, payload):
                 p = tf.add_paragraph() if tf.text else tf.paragraphs[0]
                 p.text = linha
                 p.alignment = PP_ALIGN.LEFT
+
                 for run in p.runs:
                     run.font.name = "Poppins Light"
-                    run.font.size = Pt(12)   # ✅ AUMENTADO PARA 12
+                    run.font.size = Pt(12)
                     run.font.color.rgb = AZUL_ESCURO
+
             break
 
 
-# --------------------------------------------------
-# SLIDE 17 — EMAILS DE ACESSO (Poppins Light 9)
-# --------------------------------------------------
+# ======================================================
+# SLIDE 17 — EMAILS DE ACESSO (MANUAL)
+# ======================================================
+
 def atualizar_slide_17(slide, payload):
     emails = payload.get("emails_acesso", [])
 
@@ -109,15 +126,18 @@ def atualizar_slide_17(slide, payload):
                 p = tf.add_paragraph() if tf.text else tf.paragraphs[0]
                 p.text = email
                 p.alignment = PP_ALIGN.LEFT
+
                 for run in p.runs:
-                    run.font.name = "Poppins Light"  # ✅ Light
-                    run.font.size = Pt(9)           # ✅ tamanho 9
+                    run.font.name = "Poppins Light"
+                    run.font.size = Pt(9)
+
             break
 
 
-# --------------------------------------------------
+# ======================================================
 # FUNÇÃO PRINCIPAL
-# --------------------------------------------------
+# ======================================================
+
 def generate_ppt(template_path, output_path, payload):
     prs = Presentation(template_path)
 
