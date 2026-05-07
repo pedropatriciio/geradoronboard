@@ -17,7 +17,7 @@ def extrair_texto_pdf(caminho_pdf):
 
 
 # ======================================================
-# FUNÇÕES AUXILIARES
+# CONSTANTES E HELPERS
 # ======================================================
 
 MESES = [
@@ -32,62 +32,46 @@ def normalizar_texto(texto):
 
 
 # ======================================================
-# EXTRAÇÕES ESPECÍFICAS
+# EXTRAÇÕES
 # ======================================================
 
 def extrair_vigencia(texto):
     texto = normalizar_texto(texto)
-
-    # Ex: "vigência do contrato: 12 (doze) meses"
-    match = re.search(r"vigência.*?(\d{1,2})\s*\(?.*?\)?\s*meses", texto)
+    match = re.search(
+        r"vigência.*?(\d{1,2})\s*\(?.*?\)?\s*meses",
+        texto
+    )
     if match:
         return f"{match.group(1)} meses"
-
     return "Não identificado"
 
 
 def extrair_quantidade_licencas(texto):
     texto = normalizar_texto(texto)
-
-    # Ex: "total de licenças contratadas: 100"
-    match = re.search(r"(\d{1,4})\s*\(?.*?\)?\s*licenças", texto)
+    match = re.search(
+        r"(\d{1,4})\s*\(?.*?\)?\s*licenças",
+        texto
+    )
     if match:
         return match.group(1)
-
     return "Não identificado"
 
 
-def extrair_ambiente(texto):
-    texto = normalizar_texto(texto)
-
-    if "portal mb" in texto:
-        return "Portal MB"
-    if "web" in texto:
-        return "Web"
-    if "aplicativo" in texto:
-        return "Aplicativo"
-
-    return "Não identificado"
-
+# ------------------------------------------------------
+# CATÁLOGOS — APENAS OS MARCADOS COM [x]
+# ------------------------------------------------------
 
 def extrair_catalogos(texto):
     texto = normalizar_texto(texto)
 
-    catalogos = []
-    possiveis = [
-        "ciências jurídicas",
-        "ciências exatas",
-        "letras e artes",
-        "ciências pedagógicas",
-        "ciências sociais aplicadas",
-        "saúde",
-        "técnico completo",
-        "medicina"
-    ]
+    # Captura SOMENTE itens marcados com [x]
+    marcados = re.findall(
+        r"\[\s*x\s*\]\s*([a-zà-ú\s]+)",
+        texto,
+        re.IGNORECASE
+    )
 
-    for cat in possiveis:
-        if cat in texto:
-            catalogos.append(cat.title())
+    catalogos = [c.strip().title() for c in marcados]
 
     if catalogos:
         return ", ".join(catalogos)
@@ -95,48 +79,68 @@ def extrair_catalogos(texto):
     return "Não identificado"
 
 
-def extrair_app(texto):
+# ------------------------------------------------------
+# AMBIENTE
+# ------------------------------------------------------
+
+def extrair_ambiente(texto):
     texto = normalizar_texto(texto)
 
-    # Contrato geralmente marca [x] WEB [ ] Aplicativo
-    if "aplicativo" in texto and "[ x ] aplicativo" in texto:
-        return "Sim"
-
-    # Se só WEB estiver marcado
-    if "forma de acesso" in texto and "web" in texto and "aplicativo" in texto:
-        return "Não"
+    if "portal mb" in texto:
+        return "Portal MB"
+    if re.search(r"\[\s*x\s*\]\s*web", texto):
+        return "Web"
+    if re.search(r"\[\s*x\s*\]\s*aplicativo", texto):
+        return "Aplicativo"
 
     return "Não identificado"
 
 
-def extrair_meses_gestao_licencas(texto):
-    """
-    Extrai meses de gestão de licenças de forma semântica.
-    Funciona para frases longas e linguagem jurídica.
-    """
+# ------------------------------------------------------
+# APP (SIM / NÃO)
+# ------------------------------------------------------
+
+def extrair_app(texto):
     texto = normalizar_texto(texto)
 
-    # Só tenta se existir contexto de gestão de licenças
-    if "gestão de licenças" not in texto:
+    # Só retorna SIM se o aplicativo estiver explicitamente marcado
+    if re.search(r"\[\s*x\s*\]\s*aplicativo", texto):
+        return "Sim"
+
+    return "Não"
+
+
+# ------------------------------------------------------
+# MESES DE GESTÃO DE LICENÇAS — CONTEXTO CONTROLADO
+# ------------------------------------------------------
+
+def extrair_meses_gestao_licencas(texto):
+    texto = normalizar_texto(texto)
+
+    # Isola apenas o trecho referente à gestão de licenças
+    match = re.search(
+        r"gestão de licenças:(.*?)(?:\.|\n)",
+        texto,
+        re.IGNORECASE | re.DOTALL
+    )
+
+    if not match:
         return "Não identificado"
 
+    trecho = match.group(1)
+
     encontrados = [
-        mes for mes in MESES if mes in texto
+        mes for mes in MESES if mes in trecho
     ]
 
     if not encontrados:
         return "Não identificado"
 
-    # Remove duplicados e mantém ordem natural dos meses
-    meses_ordenados = [
-        mes for mes in MESES if mes in set(encontrados)
-    ]
-
-    return ", ".join(meses_ordenados)
+    return ", ".join(encontrados)
 
 
 # ======================================================
-# FUNÇÃO PRINCIPAL (USADA PELO APP)
+# FUNÇÃO PRINCIPAL
 # ======================================================
 
 def parse_contrato_pdf(texto_pdf):
