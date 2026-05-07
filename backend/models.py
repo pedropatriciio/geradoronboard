@@ -1,30 +1,20 @@
-import sqlite3
-from pathlib import Path
+import psycopg2
+import os
 
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "database.db"
+# O Render vai fornecer essa variável
+DATABASE_URL = os.environ.get("DATABASE_URL_TEST")
+
 
 
 def get_connection():
-    return sqlite3.connect(DB_PATH)
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL não configurada nas variáveis de ambiente")
+    return psycopg2.connect(DATABASE_URL)
 
 
 def init_db():
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS colaboradores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            papel TEXT NOT NULL,
-            email TEXT,
-            telefone TEXT
-        )
-    """)
-
-    conn.commit()
-    conn.close()
+    # Nada a fazer aqui: no Supabase a tabela já foi criada manualmente
+    pass
 
 
 def buscar_colaborador(nome, papel):
@@ -32,19 +22,21 @@ def buscar_colaborador(nome, papel):
         return None
 
     conn = get_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor()
 
-    cursor.execute(
+    cur.execute(
         """
         SELECT nome, email, telefone
         FROM colaboradores
-        WHERE LOWER(nome) = LOWER(?)
-          AND LOWER(papel) = LOWER(?)
+        WHERE LOWER(nome) = LOWER(%s)
+          AND LOWER(papel) = LOWER(%s)
         """,
         (nome.strip(), papel.strip())
     )
 
-    row = cursor.fetchone()
+    row = cur.fetchone()
+
+    cur.close()
     conn.close()
 
     if not row:
@@ -59,13 +51,19 @@ def buscar_colaborador(nome, papel):
 
 def listar_colaboradores():
     conn = get_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor()
 
-    cursor.execute(
-        "SELECT nome, papel, email, telefone FROM colaboradores"
+    cur.execute(
+        """
+        SELECT nome, papel, email, telefone
+        FROM colaboradores
+        ORDER BY nome
+        """
     )
 
-    rows = cursor.fetchall()
+    rows = cur.fetchall()
+
+    cur.close()
     conn.close()
 
     return [
