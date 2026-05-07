@@ -1,73 +1,74 @@
+// ================================
+// CONFIGURAÇÃO
+// ================================
+const BACKEND_URL = "https://geradoronboard.onrender.com";
+
+// ================================
+// ELEMENTOS DO DOM
+// ================================
 const form = document.getElementById("pptForm");
-const statusMessage = document.getElementById("statusMessage");
-const submitBtn = document.getElementById("submitBtn");
 const comercialSelect = document.getElementById("comercial");
 const csSelect = document.getElementById("cs");
-const pdfInput = document.getElementById("contrato_pdf");
+const statusMessage = document.getElementById("statusMessage");
 
-// ------------------------------
-// Carregar colaboradores do backend
-// ------------------------------
+// ================================
+// CARREGAR COLABORADORES (SUPABASE)
+// ================================
 async function carregarColaboradores() {
   try {
-    const response = await fetch("http://localhost:5000/colaboradores");
+    const response = await fetch(`${BACKEND_URL}/colaboradores`);
+
+    if (!response.ok) {
+      throw new Error("Falha ao buscar colaboradores");
+    }
+
     const colaboradores = await response.json();
 
-    colaboradores.forEach(pessoa => {
+    // Limpa selects
+    comercialSelect.innerHTML = '<option value="">Selecione</option>';
+    csSelect.innerHTML = '<option value="">Selecione</option>';
+
+    colaboradores.forEach((pessoa) => {
       const option = document.createElement("option");
       option.value = pessoa.nome;
       option.textContent = pessoa.nome;
 
-      if (pessoa.papel.toLowerCase() === "comercial") {
-        comercialSelect.appendChild(option.cloneNode(true));
+      if (pessoa.papel === "Comercial") {
+        comercialSelect.appendChild(option);
       }
 
-      if (pessoa.papel.toLowerCase() === "cs") {
-        csSelect.appendChild(option.cloneNode(true));
+      if (pessoa.papel === "CS") {
+        csSelect.appendChild(option);
       }
     });
-  } catch (e) {
+
+    statusMessage.textContent = "";
+
+  } catch (error) {
+    console.error("Erro ao carregar responsáveis:", error);
     statusMessage.textContent = "Erro ao carregar responsáveis.";
   }
 }
 
-document.addEventListener("DOMContentLoaded", carregarColaboradores);
+// ================================
+// SUBMIT DO FORMULÁRIO
+// ================================
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
 
-// ------------------------------
-// Validação simples do formulário
-// ------------------------------
-function validarFormulario() {
-  submitBtn.disabled = !(
-    pdfInput.files.length &&
-    comercialSelect.value &&
-    csSelect.value
-  );
-}
-
-pdfInput.addEventListener("change", validarFormulario);
-comercialSelect.addEventListener("change", validarFormulario);
-csSelect.addEventListener("change", validarFormulario);
-
-// ------------------------------
-// Envio do formulário
-// ------------------------------
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
   statusMessage.textContent = "Gerando apresentação...";
-
-  submitBtn.disabled = true;
 
   const formData = new FormData(form);
 
   try {
-    const response = await fetch("http://localhost:5000/generate", {
+    const response = await fetch(`${BACKEND_URL}/generate`, {
       method: "POST",
-      body: formData
+      body: formData,
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Erro ao gerar PPTX");
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Erro ao gerar apresentação");
     }
 
     const blob = await response.blob();
@@ -82,9 +83,13 @@ form.addEventListener("submit", async (e) => {
 
     statusMessage.textContent = "Apresentação gerada com sucesso!";
 
-  } catch (err) {
-    statusMessage.textContent = err.message;
-  } finally {
-    submitBtn.disabled = false;
+  } catch (error) {
+    console.error(error);
+    statusMessage.textContent = "Erro ao gerar apresentação.";
   }
 });
+
+// ================================
+// INICIALIZAÇÃO
+// ================================
+document.addEventListener("DOMContentLoaded", carregarColaboradores);
