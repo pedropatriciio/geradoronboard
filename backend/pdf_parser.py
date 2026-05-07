@@ -3,21 +3,21 @@ import re
 
 
 # ======================================================
-# EXTRAÇÃO DO TEXTO DO PDF
+# EXTRAÇÃO BRUTA DO TEXTO
 # ======================================================
 
 def extrair_texto_pdf(caminho_pdf):
     texto = ""
     with pdfplumber.open(caminho_pdf) as pdf:
-        for pagina in pdf.pages:
-            conteudo = pagina.extract_text()
-            if conteudo:
-                texto += "\n" + conteudo
+        for página in pdf.pages:
+            t = página.extract_text()
+            if t:
+                texto += "\n" + t
     return texto
 
 
 # ======================================================
-# CONSTANTES E HELPERS
+# HELPERS
 # ======================================================
 
 MESES = [
@@ -27,8 +27,17 @@ MESES = [
 ]
 
 
-def normalizar_texto(texto):
+def normalizar(texto):
     return re.sub(r"\s+", " ", texto.lower())
+
+
+def extrair_bloco(texto, inicio, paradas):
+    """
+    Extrai um bloco textual entre um título e o próximo título conhecido.
+    """
+    padrao = rf"{inicio}(.*?)(?:{'|'.join(paradas)})"
+    match = re.search(padrao, texto, re.IGNORECASE | re.DOTALL)
+    return match.group(1) if match else ""
 
 
 # ======================================================
@@ -36,107 +45,77 @@ def normalizar_texto(texto):
 # ======================================================
 
 def extrair_vigencia(texto):
-    texto = normalizar_texto(texto)
-    match = re.search(
-        r"vigência.*?(\d{1,2})\s*\(?.*?\)?\s*meses",
-        texto
-    )
-    if match:
-        return f"{match.group(1)} meses"
-    return "Não identificado"
+    texto = normalizar(texto)
+    m = re.search(r"vigência do contrato:\s*(\d+)", texto)
+    return f"{m.group(1)} meses" if m else "Não identificado"
 
 
-def extrair_quantidade_licencas(texto):
-    texto = normalizar_texto(texto)
-    match = re.search(
-        r"(\d{1,4})\s*\(?.*?\)?\s*licenças",
-        texto
-    )
-    if match:
-        return match.group(1)
-    return "Não identificado"
+def extrair_licencas(texto):
+    texto = normalizar(texto)
 
+    # Prioridade: total de licenças contratadas
+    m = re.search(r"total de licenças contratadas:\s*(\d+)", texto)
+    if m:
+        return m.group(1)
 
-# ------------------------------------------------------
-# CATÁLOGOS — APENAS OS MARCADOS COM [x]
-# ------------------------------------------------------
+    # Fallback
+    m = re.search(r"(\d+)\s*licenças", texto)
+    return m.group(1) if m else "Não identificado"
+
 
 def extrair_catalogos(texto):
-    texto = normalizar_texto(texto)
+    texto = normalizar(texto)
 
-    # Captura SOMENTE itens marcados com [x]
-    marcados = re.findall(
-        r"\[\s*x\s*\]\s*([a-zà-ú\s]+)",
+    bloco = extrair_bloco(
         texto,
-        re.IGNORECASE
+        "demais catálogos",
+        [
+            "valor unitário",
+            "valor total",
+            "forma de acesso",
+            "pré-cadastro",
+            "gestão de licenças"
+        ]
     )
 
+    marcados = re.findall(r"\[\s*x\s*\]\s*([a-zà-ú\s]+)", bloco)
     catalogos = [c.strip().title() for c in marcados]
 
-    if catalogos:
-        return ", ".join(catalogos)
+    return ", ".join(catalogos) if catalogos else "Não identificado"
 
-    return "Não identificado"
-
-
-# ------------------------------------------------------
-# AMBIENTE
-# ------------------------------------------------------
 
 def extrair_ambiente(texto):
-    texto = normalizar_texto(texto)
+    texto = normalizar(texto)
 
-    if "portal mb" in texto:
+    if re.search(r"\[\s*x\s*\]\s*portal mb", texto):
         return "Portal MB"
     if re.search(r"\[\s*x\s*\]\s*web", texto):
         return "Web"
-    if re.search(r"\[\s*x\s*\]\s*aplicativo", texto):
-        return "Aplicativo"
 
     return "Não identificado"
 
 
-# ------------------------------------------------------
-# APP (SIM / NÃO)
-# ------------------------------------------------------
-
 def extrair_app(texto):
-    texto = normalizar_texto(texto)
-
-    # Só retorna SIM se o aplicativo estiver explicitamente marcado
-    if re.search(r"\[\s*x\s*\]\s*aplicativo", texto):
-        return "Sim"
-
-    return "Não"
+    texto = normalizar(texto)
+    return "Sim" if re.search(r"\[\s*x\s*\]\s*aplicativo", texto) else "Não"
 
 
-# ------------------------------------------------------
-# MESES DE GESTÃO DE LICENÇAS — CONTEXTO CONTROLADO
-# ------------------------------------------------------
+def extrair_meses_gestao(texto):
+    texto = normalizar(texto)
 
-def extrair_meses_gestao_licencas(texto):
-    texto = normalizar_texto(texto)
-
-    # Isola apenas o trecho referente à gestão de licenças
-    match = re.search(
-        r"gestão de licenças:(.*?)(?:\.|\n)",
+    bloco = extrair_bloco(
         texto,
-        re.IGNORECASE | re.DOTALL
+        "gestão de licenças:",
+        [
+            "d4sign",
+            "pré-cadastro",
+            "anexo",
+            "cláusula"
+        ]
     )
 
-    if not match:
-        return "Não identificado"
-
-    trecho = match.group(1)
-
-    encontrados = [
-        mes for mes in MESES if mes in trecho
-    ]
-
-    if not encontrados:
-        return "Não identificado"
-
-    return ", ".join(encontrados)
+    encontrados = [m for m in MESES if m in bloco]
+    return ", ".join(encontrados) if encontrados else "Não identificado"
 
 
 # ======================================================
@@ -146,9 +125,9 @@ def extrair_meses_gestao_licencas(texto):
 def parse_contrato_pdf(texto_pdf):
     return {
         "vigencia": extrair_vigencia(texto_pdf),
-        "ambiente": extrair_ambiente(texto_pdf),
-        "licencas": extrair_quantidade_licencas(texto_pdf),
+        "licencas": extrair_licencas(texto_pdf),
         "catalogos": extrair_catalogos(texto_pdf),
-        "gestao_licencas": extrair_meses_gestao_licencas(texto_pdf),
+        "ambiente": extrair_ambiente(texto_pdf),
+        "gestao_licencas": extrair_meses_gestao(texto_pdf),
         "app": extrair_app(texto_pdf),
     }
