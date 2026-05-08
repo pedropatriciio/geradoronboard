@@ -3,14 +3,14 @@ import re
 
 
 # ======================================================
-# EXTRAÇÃO BRUTA DO TEXTO
+# EXTRAÇÃO BRUTA DO PDF
 # ======================================================
 
 def extrair_texto_pdf(caminho_pdf):
     texto = ""
     with pdfplumber.open(caminho_pdf) as pdf:
-        for página in pdf.pages:
-            t = página.extract_text()
+        for pagina in pdf.pages:
+            t = pagina.extract_text()
             if t:
                 texto += "\n" + t
     return texto
@@ -31,10 +31,14 @@ def normalizar(texto):
     return re.sub(r"\s+", " ", texto.lower())
 
 
+def normalizar_numero(numero_str):
+    """
+    Converte '15.000' -> '15000'
+    """
+    return numero_str.replace(".", "")
+
+
 def extrair_bloco(texto, inicio, paradas):
-    """
-    Extrai um bloco textual entre um título e o próximo título conhecido.
-    """
     padrao = rf"{inicio}(.*?)(?:{'|'.join(paradas)})"
     match = re.search(padrao, texto, re.IGNORECASE | re.DOTALL)
     return match.group(1) if match else ""
@@ -50,22 +54,30 @@ def extrair_vigencia(texto):
     return f"{m.group(1)} meses" if m else "Não identificado"
 
 
-def extrair_licencas(texto):
+def extrair_total_licencas(texto):
     texto = normalizar(texto)
 
-    # Prioridade: total de licenças contratadas
-    m = re.search(r"total de licenças contratadas:\s*(\d+)", texto)
+    # Ex.: 15.000 (quinze mil) licenças
+    m = re.search(r"total de licenças contratadas:\s*([\d\.]+)", texto)
     if m:
-        return m.group(1)
+        return normalizar_numero(m.group(1))
 
-    # Fallback
-    m = re.search(r"(\d+)\s*licenças", texto)
-    return m.group(1) if m else "Não identificado"
+    return "Não identificado"
 
 
 def extrair_catalogos(texto):
     texto = normalizar(texto)
+    catalogos = []
 
+    # -----------------------
+    # MEDICINA (bloco próprio)
+    # -----------------------
+    if re.search(r"\[\s*x\s*\]\s*medicina", texto):
+        catalogos.append("Medicina")
+
+    # -----------------------
+    # DEMAIS CATÁLOGOS
+    # -----------------------
     bloco = extrair_bloco(
         texto,
         "demais catálogos",
@@ -78,20 +90,25 @@ def extrair_catalogos(texto):
         ]
     )
 
-    marcados = re.findall(r"\[\s*x\s*\]\s*([a-zà-ú\s]+)", bloco)
-    catalogos = [c.strip().title() for c in marcados]
+    marcados = re.findall(
+        r"\[\s*x\s*\]\s*([a-zà-ú\s]+)",
+        bloco
+    )
+
+    for cat in marcados:
+        nome = cat.strip().title()
+        if nome not in catalogos:
+            catalogos.append(nome)
 
     return ", ".join(catalogos) if catalogos else "Não identificado"
 
 
 def extrair_ambiente(texto):
     texto = normalizar(texto)
-
     if re.search(r"\[\s*x\s*\]\s*portal mb", texto):
         return "Portal MB"
     if re.search(r"\[\s*x\s*\]\s*web", texto):
         return "Web"
-
     return "Não identificado"
 
 
@@ -102,20 +119,13 @@ def extrair_app(texto):
 
 def extrair_meses_gestao(texto):
     texto = normalizar(texto)
-
     bloco = extrair_bloco(
         texto,
         "gestão de licenças:",
-        [
-            "d4sign",
-            "pré-cadastro",
-            "anexo",
-            "cláusula"
-        ]
+        ["anexo", "cláusula", "d4sign"]
     )
-
-    encontrados = [m for m in MESES if m in bloco]
-    return ", ".join(encontrados) if encontrados else "Não identificado"
+    meses = [m for m in MESES if m in bloco]
+    return ", ".join(meses) if meses else "Não identificado"
 
 
 # ======================================================
@@ -125,7 +135,7 @@ def extrair_meses_gestao(texto):
 def parse_contrato_pdf(texto_pdf):
     return {
         "vigencia": extrair_vigencia(texto_pdf),
-        "licencas": extrair_licencas(texto_pdf),
+        "licencas": extrair_total_licencas(texto_pdf),
         "catalogos": extrair_catalogos(texto_pdf),
         "ambiente": extrair_ambiente(texto_pdf),
         "gestao_licencas": extrair_meses_gestao(texto_pdf),
